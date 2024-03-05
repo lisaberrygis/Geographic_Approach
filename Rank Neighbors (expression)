@@ -1,0 +1,41 @@
+///// Inputs
+var fieldname = "Forest_Area_Change_20_Year"  // Must be a string with the exact name of the field you want to compare
+var geonamefield = "geoAreaName"              // A string specifying the field that says the geography name 
+var geoType = "countries"                     // A description of the geography type in a plural format (ex: "counties")
+var datasuffix = "%"                          // This script is best used with normalized values, like a percentage
+var reverseOrder = false                      // If lower values are the "top" of your rank, switch this to true. By default, the highest value ranks at the top
+
+//// Rank comparison (No need to touch this part of the expression unless you want to make sepcific changes to the logic)
+var bufferThisCountry = Buffer($feature, 10, "miles")
+var neighbors = Intersects($layer,bufferThisCountry)
+if(reverseOrder == false){
+  var order = OrderBy(neighbors, "(" + fieldname + ") DESC")
+}
+if(reverseOrder == True){
+  var order =  OrderBy(neighbors, "(" + fieldname + ") ASC")
+}
+var neighborCount = iif(count(order) == 0, 0, count(order)-1)
+var rank = 0
+var txt = ""
+var endrankcount = False
+var lastvalue = null
+var tie = False
+for(var x in order){
+  txt += " - " + x[geonamefield] + ": " + Round(x[fieldname],1) + datasuffix + TextFormatting.NewLine
+  iif(endrankcount == True || x[fieldname] == lastvalue,null,rank++)
+  iif(x[fieldname] == lastvalue, tie = True, null)
+  if(x[geonamefield] == $feature[geonamefield]){
+    endrankcount = True
+  }
+  lastvalue = x[fieldname] 
+}
+var ranktext = ""
+when(rank == 1, ranktext = "the highest",
+  rank == 2, ranktext = "2nd highest",
+  rank == 3, ranktext = "3rd",
+  ranktext = rank + "th")
+
+// Create final text
+var tietxt = iif(tie == True, " (multiple " + geoType + " have the same value)", null)
+var finalTxt = $feature[geonamefield] + " has " + neighborCount + " neighboring " + geoType +", and ranks " + ranktext + TextFormatting.NewLine + txt + tietxt 
+return finalTxt
